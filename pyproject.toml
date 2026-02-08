@@ -14,7 +14,7 @@ exclude = [
 
 [tool.ruff.lint]
 # Enable the same rule categories that flake8 was checking
-# E9: Runtime errors
+# E9: Syntax and indentation errors
 # F63, F7, F82: Various pyflakes errors (undefined names, syntax errors, etc.)
 # E: pycodestyle errors
 # F: pyflakes
