@@ -8,7 +8,7 @@ zero-trust network architectures and access management systems.
 import logging
 import socket
 import threading
-from typing import Dict, Optional, Callable, Tuple
+from typing import Dict, Optional, Callable, Tuple, Any
 from dataclasses import dataclass
 from enum import Enum
 
@@ -26,7 +26,7 @@ class Connection:
     source_addr: Tuple[str, int]
     destination: str
     protocol: str
-    metadata: Dict[str, any]
+    metadata: Dict[str, Any]
 
 
 class Attractor:
@@ -247,7 +247,7 @@ class Attractor:
         
         return "unknown"
     
-    def get_stats(self) -> Dict[str, any]:
+    def get_stats(self) -> Dict[str, Any]:
         """
         Get statistics about the Attractor.
         
