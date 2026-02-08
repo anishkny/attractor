@@ -1,0 +1,69 @@
+digraph CompleteExample {
+    graph [
+        goal="Demonstrate all implemented features",
+        label="Complete Feature Demo"
+    ]
+    
+    // Entry and exit points
+    start [shape=Mdiamond, label="Start"]
+    exit  [shape=Msquare, label="Exit"]
+    
+    // LLM tasks with different configurations
+    plan [
+        label="Planning Phase",
+        prompt="Create a plan for: $goal",
+        max_retries=2
+    ]
+    
+    implement [
+        label="Implementation",
+        prompt="Implement the plan",
+        goal_gate=true,
+        max_retries=3,
+        timeout="1800s"
+    ]
+    
+    validate [
+        label="Validation",
+        prompt="Validate the implementation"
+    ]
+    
+    // Conditional routing node
+    quality_gate [
+        shape=diamond,
+        label="Quality Check"
+    ]
+    
+    // Optional enhancement
+    enhance [
+        label="Enhancement",
+        prompt="Add enhancements if needed"
+    ]
+    
+    // Flow with conditional branching
+    start -> plan
+    plan -> implement
+    implement -> validate
+    
+    // Conditional routing based on outcomes
+    validate -> quality_gate
+    quality_gate -> enhance [
+        label="Needs Enhancement",
+        condition="outcome=success",
+        weight=10
+    ]
+    quality_gate -> implement [
+        label="Failed Validation",
+        condition="outcome=fail",
+        weight=5
+    ]
+    
+    enhance -> exit
+    
+    // Alternative success path
+    quality_gate -> exit [
+        label="Direct Success",
+        condition="outcome!=fail",
+        weight=1
+    ]
+}
