@@ -19,7 +19,7 @@ setup(
     },
     entry_points={
         "console_scripts": [
-            "attractor=attractor.cli:main",
+            "py-attractor=attractor.cli:main",
         ],
     },
 )
