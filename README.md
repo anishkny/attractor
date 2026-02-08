@@ -1,6 +1,7 @@
 # Attractor
 
 [![CI](https://github.com/anishkny/test/actions/workflows/ci.yml/badge.svg)](https://github.com/anishkny/test/actions/workflows/ci.yml)
+[![GitHub commits since latest release](https://img.shields.io/github/commits-since/anishkny/attractor/latest)](https://github.com/anishkny/attractor/compare/latest...main)
 
 A DOT-based pipeline runner that uses directed graphs (defined in Graphviz DOT syntax) to orchestrate multi-stage AI workflows.
 
