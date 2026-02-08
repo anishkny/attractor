@@ -1,0 +1,36 @@
+[tool.ruff]
+# Modern recommended line length
+line-length = 88
+
+# Assume Python 3.8+ (matching setup.py requirement)
+target-version = "py38"
+
+[tool.ruff.lint]
+# Use modern recommended rule set
+select = [
+    "E",      # pycodestyle errors
+    "W",      # pycodestyle warnings
+    "F",      # pyflakes
+    "I",      # isort
+    "N",      # pep8-naming
+    "UP",     # pyupgrade
+    "B",      # flake8-bugbear
+    "C4",     # flake8-comprehensions
+    "SIM",    # flake8-simplify
+    "RUF",    # ruff-specific rules
+]
+
+# Ignore specific rules that may be too strict for this codebase
+ignore = [
+    "E501",   # line too long (let formatter handle it)
+]
+
+[tool.ruff.lint.mccabe]
+max-complexity = 15
+
+[tool.ruff.format]
+# Use double quotes for strings
+quote-style = "double"
+
+# Use spaces for indentation
+indent-style = "space"
