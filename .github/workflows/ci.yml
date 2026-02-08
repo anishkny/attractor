@@ -34,6 +34,8 @@ jobs:
     
     - name: Validate example pipelines
       run: |
-        python -m attractor.cli examples/simple.dot --validate-only
-        python -m attractor.cli examples/branching.dot --validate-only
-        python -m attractor.cli examples/complete.dot --validate-only
+        shopt -s nullglob
+        for file in examples/*.dot; do
+          echo "Validating $file..."
+          python -m attractor.cli "$file" --validate-only
+        done
