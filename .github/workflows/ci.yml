@@ -25,10 +25,8 @@ jobs:
     
     - name: Lint with ruff
       run: |
-        # Check for critical errors (equivalent to flake8's E9,F63,F7,F82)
-        ruff check src --select=E9,F63,F7,F82
-        # Full lint check with configured rules (non-blocking, for informational purposes)
-        ruff check src --exit-zero
+        ruff check src
+        ruff format --check src
     
     - name: Run tests
       run: |

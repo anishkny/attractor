@@ -1,29 +1,36 @@
 [tool.ruff]
-# Set the maximum line length to 127 (matching flake8 config)
-line-length = 127
+# Modern recommended line length
+line-length = 88
 
-# Exclude common directories
-exclude = [
-    ".git",
-    ".pytest_cache",
-    "__pycache__",
-    "build",
-    "dist",
-    "*.egg-info",
-]
+# Assume Python 3.8+ (matching setup.py requirement)
+target-version = "py38"
 
 [tool.ruff.lint]
-# Enable the same rule categories that flake8 was checking
-# E9: Syntax and indentation errors
-# F63, F7, F82: Various pyflakes errors (undefined names, syntax errors, etc.)
-# E: pycodestyle errors
-# F: pyflakes
-# C90: mccabe complexity
-select = ["E", "F", "C90"]
+# Use modern recommended rule set
+select = [
+    "E",      # pycodestyle errors
+    "W",      # pycodestyle warnings
+    "F",      # pyflakes
+    "I",      # isort
+    "N",      # pep8-naming
+    "UP",     # pyupgrade
+    "B",      # flake8-bugbear
+    "C4",     # flake8-comprehensions
+    "SIM",    # flake8-simplify
+    "RUF",    # ruff-specific rules
+]
 
-# Ignore whitespace warnings that were only reported but not enforced by flake8
-ignore = ["W293"]  # blank line contains whitespace
+# Ignore specific rules that may be too strict for this codebase
+ignore = [
+    "E501",   # line too long (let formatter handle it)
+]
 
 [tool.ruff.lint.mccabe]
-# Set max complexity to 10 (matching flake8 config)
-max-complexity = 10
+max-complexity = 15
+
+[tool.ruff.format]
+# Use double quotes for strings
+quote-style = "double"
+
+# Use spaces for indentation
+indent-style = "space"
