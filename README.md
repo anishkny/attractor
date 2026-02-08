@@ -79,11 +79,13 @@ pytest tests/
 pytest tests/ -v
 ```
 
-Currently **27 tests passing**, including:
+Currently **47 tests passing**, including:
 - DOT parser tests
 - Validation and linting tests  
 - Execution engine tests
 - Condition evaluation tests
+- Handler tests (tool, human-in-the-loop, parallel)
+- Stylesheet parsing and matching tests
 - Integration tests matching the spec's smoke test
 
 ## Examples
@@ -101,15 +103,19 @@ Core features implemented:
 - ✅ Edge selection with 5-step priority algorithm
 - ✅ Condition evaluation (=, !=, && operators)
 - ✅ Basic handlers (start, exit, codergen, conditional)
+- ✅ Tool handler (parallelogram nodes) - shell command execution
+- ✅ Human-in-the-loop handler (hexagon nodes) - interactive gates
+- ✅ Parallel execution handler (component nodes) - concurrent branches
+- ✅ Fan-in handler (tripleoctagon nodes) - result consolidation
+- ✅ Model stylesheet parser - CSS-like LLM configuration
 - ✅ CLI interface
 - ✅ Variable expansion ($goal)
 
 Not yet implemented:
-- ⏳ Human-in-the-loop (hexagon nodes)
-- ⏳ Parallel execution (component nodes)
-- ⏳ Model stylesheet
+- ⏳ Manager loop handler (house nodes) - supervisor pattern
 - ⏳ HTTP server mode
 - ⏳ Observability events
+- ⏳ Full parallel subgraph execution (current implementation is simplified)
 
 ## License
 
