@@ -37,7 +37,6 @@ jobs:
       uses: pypa/gh-action-pypi-publish@release/v1
     
     - name: Tag and push latest
-      if: success()
       run: |
         git config user.name "github-actions[bot]"
         git config user.email "github-actions[bot]@users.noreply.github.com"
