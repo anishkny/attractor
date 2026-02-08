@@ -6,7 +6,7 @@ long_description = (this_directory / "README.md").read_text(encoding="utf-8")
 
 setup(
     name="py-attractor",
-    version="0.1.1",
+    version="0.2.0",
     description="A DOT-based pipeline runner for AI workflows",
     long_description=long_description,
     long_description_content_type="text/markdown",
