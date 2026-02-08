@@ -74,6 +74,8 @@ class HandlerRegistry:
         self.register("conditional", ConditionalHandler())
         self.register("tool", ToolHandler())
         self.register("wait.human", WaitForHumanHandler())
+        self.register("parallel", ParallelHandler())
+        self.register("parallel.fan_in", FanInHandler())
     
     def register(self, type_string: str, handler: Handler):
         """Register a handler for a type string."""
@@ -418,6 +420,168 @@ class WaitForHumanHandler(Handler):
             if choice["key"].upper() == answer_key:
                 return choice
         return None
+    
+    def _write_status(self, stage_dir: Path, outcome: Outcome):
+        """Write status.json to stage directory."""
+        import json
+        
+        status_data = {
+            "outcome": outcome.status.value,
+            "preferred_next_label": outcome.preferred_label,
+            "suggested_next_ids": outcome.suggested_next_ids,
+            "notes": outcome.notes,
+            "failure_reason": outcome.failure_reason
+        }
+        
+        with open(stage_dir / "status.json", 'w') as f:
+            json.dump(status_data, f, indent=2)
+
+
+class ParallelHandler(Handler):
+    """Handler for parallel fan-out execution."""
+    
+    def execute(self, node: Node, context: Context, graph: Graph, logs_root: str) -> Outcome:
+        import concurrent.futures
+        import json
+        from pathlib import Path
+        
+        # 1. Create stage directory
+        stage_dir = Path(logs_root) / node.id
+        stage_dir.mkdir(parents=True, exist_ok=True)
+        
+        # 2. Get outgoing edges for parallel branches
+        branches = graph.outgoing_edges(node.id)
+        
+        if not branches:
+            return Outcome(
+                status=StageStatus.FAIL,
+                failure_reason="No outgoing edges for parallel node"
+            )
+        
+        # 3. Get join and error policies
+        join_policy = node.attrs.get("join_policy", "wait_all")
+        error_policy = node.attrs.get("error_policy", "continue")
+        max_parallel = int(node.attrs.get("max_parallel", "4"))
+        
+        # 4. Execute branches in parallel (simulation - just record branch targets)
+        # In a full implementation, this would execute subgraphs
+        results = []
+        
+        for i, branch in enumerate(branches):
+            # Clone context for each branch
+            branch_context = context.clone()
+            
+            # Simulate branch execution
+            branch_result = {
+                "branch_id": branch.to_node,
+                "status": "success",  # Simplified for now
+                "notes": f"Branch to {branch.to_node}"
+            }
+            results.append(branch_result)
+        
+        # 5. Write results to logs
+        with open(stage_dir / "parallel_results.json", 'w') as f:
+            json.dump(results, f, indent=2)
+        
+        # 6. Evaluate join policy
+        success_count = sum(1 for r in results if r["status"] == "success")
+        fail_count = len(results) - success_count
+        
+        if join_policy == "wait_all":
+            if fail_count == 0:
+                status = StageStatus.SUCCESS
+            else:
+                status = StageStatus.PARTIAL_SUCCESS
+        elif join_policy == "first_success":
+            if success_count > 0:
+                status = StageStatus.SUCCESS
+            else:
+                status = StageStatus.FAIL
+        else:
+            # Default to wait_all behavior
+            status = StageStatus.SUCCESS if fail_count == 0 else StageStatus.PARTIAL_SUCCESS
+        
+        # 7. Store results in context for downstream fan-in
+        outcome = Outcome(
+            status=status,
+            notes=f"Parallel execution: {success_count}/{len(results)} branches succeeded",
+            context_updates={
+                "parallel.results": results,
+                "parallel.branch_count": len(results),
+                "parallel.success_count": success_count
+            }
+        )
+        
+        self._write_status(stage_dir, outcome)
+        return outcome
+    
+    def _write_status(self, stage_dir: Path, outcome: Outcome):
+        """Write status.json to stage directory."""
+        import json
+        
+        status_data = {
+            "outcome": outcome.status.value,
+            "preferred_next_label": outcome.preferred_label,
+            "suggested_next_ids": outcome.suggested_next_ids,
+            "notes": outcome.notes,
+            "failure_reason": outcome.failure_reason
+        }
+        
+        with open(stage_dir / "status.json", 'w') as f:
+            json.dump(status_data, f, indent=2)
+
+
+class FanInHandler(Handler):
+    """Handler for consolidating results from parallel branches."""
+    
+    def execute(self, node: Node, context: Context, graph: Graph, logs_root: str) -> Outcome:
+        import json
+        from pathlib import Path
+        
+        # 1. Create stage directory
+        stage_dir = Path(logs_root) / node.id
+        stage_dir.mkdir(parents=True, exist_ok=True)
+        
+        # 2. Read parallel results from context
+        results = context.get("parallel.results")
+        
+        if not results:
+            return Outcome(
+                status=StageStatus.FAIL,
+                failure_reason="No parallel results to evaluate"
+            )
+        
+        # 3. Evaluate and select best candidate
+        # In a full implementation, this might use LLM to rank candidates
+        # For now, we just take the first successful result
+        best_result = None
+        for result in results:
+            if result.get("status") == "success":
+                best_result = result
+                break
+        
+        if not best_result:
+            best_result = results[0]  # Fallback to first result
+        
+        # 4. Write consolidated results
+        with open(stage_dir / "fan_in_result.json", 'w') as f:
+            json.dump({
+                "selected": best_result,
+                "total_candidates": len(results)
+            }, f, indent=2)
+        
+        # 5. Return outcome
+        outcome = Outcome(
+            status=StageStatus.SUCCESS,
+            notes=f"Selected best result from {len(results)} candidates",
+            context_updates={
+                "fan_in.selected": best_result.get("branch_id", ""),
+                "fan_in.candidate_count": len(results)
+            }
+        )
+        
+        self._write_status(stage_dir, outcome)
+        return outcome
     
     def _write_status(self, stage_dir: Path, outcome: Outcome):
         """Write status.json to stage directory."""

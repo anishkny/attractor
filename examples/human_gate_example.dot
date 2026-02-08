@@ -1,0 +1,44 @@
+digraph HumanGateExample {
+    graph [
+        goal="Demonstrate human-in-the-loop gates",
+        label="Human Gate Example"
+    ]
+    
+    start [shape=Mdiamond, label="Start"]
+    exit  [shape=Msquare, label="Exit"]
+    
+    // Planning phase
+    plan [
+        label="Planning",
+        prompt="Create a simple implementation plan"
+    ]
+    
+    // Human review gate
+    review_gate [
+        shape=hexagon,
+        label="Review and Approve Plan"
+    ]
+    
+    // Different paths based on human decision
+    implement [
+        label="Implementation",
+        prompt="Implement the approved plan"
+    ]
+    
+    revise [
+        label="Revise Plan",
+        prompt="Revise the plan based on feedback"
+    ]
+    
+    // Main flow
+    start -> plan -> review_gate
+    
+    // Human gate options
+    review_gate -> implement [label="[A] Approve"]
+    review_gate -> revise [label="[R] Revise"]
+    review_gate -> exit [label="[C] Cancel"]
+    
+    // Paths
+    implement -> exit
+    revise -> review_gate
+}

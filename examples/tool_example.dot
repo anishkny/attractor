@@ -1,0 +1,30 @@
+digraph ToolExample {
+    graph [
+        goal="Demonstrate tool handler",
+        label="Tool Handler Example"
+    ]
+    
+    start [shape=Mdiamond, label="Start"]
+    exit  [shape=Msquare, label="Exit"]
+    
+    // Tool node - runs a shell command
+    create_file [
+        shape=parallelogram,
+        label="Create Test File",
+        prompt="echo 'Hello from tool handler' > /tmp/test_output.txt"
+    ]
+    
+    read_file [
+        shape=parallelogram,
+        label="Read Test File",
+        prompt="cat /tmp/test_output.txt"
+    ]
+    
+    cleanup [
+        shape=parallelogram,
+        label="Cleanup",
+        prompt="rm /tmp/test_output.txt"
+    ]
+    
+    start -> create_file -> read_file -> cleanup -> exit
+}
