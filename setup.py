@@ -1,9 +1,15 @@
 from setuptools import setup, find_packages
+from pathlib import Path
+
+this_directory = Path(__file__).parent
+long_description = (this_directory / "README.md").read_text(encoding="utf-8")
 
 setup(
     name="py-attractor",
     version="0.1.1",
     description="A DOT-based pipeline runner for AI workflows",
+    long_description=long_description,
+    long_description_content_type="text/markdown",
     author="Attractor Contributors",
     packages=find_packages(where="src"),
     package_dir={"": "src"},
