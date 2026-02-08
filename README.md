@@ -1,5 +1,7 @@
 # Attractor
 
+[![CI](https://github.com/anishkny/test/actions/workflows/ci.yml/badge.svg)](https://github.com/anishkny/test/actions/workflows/ci.yml)
+
 A DOT-based pipeline runner that uses directed graphs (defined in Graphviz DOT syntax) to orchestrate multi-stage AI workflows.
 
 ## Overview
