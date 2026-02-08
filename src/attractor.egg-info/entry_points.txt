@@ -1,2 +1,0 @@
-[console_scripts]
-attractor = attractor.cli:main
