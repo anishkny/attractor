@@ -3,7 +3,7 @@ Node handlers for Attractor pipelines.
 """
 
 from abc import ABC, abstractmethod
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, Tuple
 import os
 from pathlib import Path
 
@@ -11,6 +11,10 @@ from .models import (
     Node, Context, Graph, Outcome, StageStatus,
     Question, QuestionType, Option, Answer, AnswerStatus
 )
+
+
+# Constants
+MAX_OUTPUT_LENGTH = 200  # Maximum length for output snippets in context
 
 
 class Handler(ABC):
@@ -35,7 +39,7 @@ class Interviewer(ABC):
     """Interface for human interaction (TUI, web, IDE frontends)."""
     
     @abstractmethod
-    def ask(self, question: Question) -> tuple[AnswerStatus, Optional[Answer]]:
+    def ask(self, question: Question) -> Tuple[AnswerStatus, Optional[Answer]]:
         """
         Present a question to the human and wait for an answer.
         
@@ -179,7 +183,7 @@ class CodergenHandler(Handler):
             notes=f"Stage completed: {node.id}",
             context_updates={
                 "last_stage": node.id,
-                "last_response": response_text[:200] if response_text else ""
+                "last_response": response_text[:MAX_OUTPUT_LENGTH] if response_text else ""
             }
         )
         
@@ -230,12 +234,18 @@ class ToolHandler(Handler):
         
         # 5. Execute command
         try:
+            timeout_value = node.attrs.get('timeout')
+            if timeout_value and isinstance(timeout_value, str):
+                # Parse duration string like "900s" to seconds
+                from .models import parse_duration
+                timeout_value = parse_duration(timeout_value)
+            
             result = subprocess.run(
                 command,
                 shell=True,
                 capture_output=True,
                 text=True,
-                timeout=node.timeout if hasattr(node, 'timeout') and node.timeout else None
+                timeout=timeout_value
             )
             
             # 6. Write stdout and stderr to logs
@@ -250,7 +260,7 @@ class ToolHandler(Handler):
                     status=StageStatus.SUCCESS,
                     notes=f"Tool execution succeeded: {node.id}",
                     context_updates={
-                        "last_tool_stdout": result.stdout[:200] if result.stdout else "",
+                        "last_tool_stdout": result.stdout[:MAX_OUTPUT_LENGTH] if result.stdout else "",
                         "last_tool_returncode": str(result.returncode)
                     }
                 )
@@ -258,7 +268,7 @@ class ToolHandler(Handler):
                 outcome = Outcome(
                     status=StageStatus.FAIL,
                     failure_reason=f"Tool execution failed with return code {result.returncode}",
-                    notes=result.stderr[:200] if result.stderr else ""
+                    notes=result.stderr[:MAX_OUTPUT_LENGTH] if result.stderr else ""
                 )
         
         except subprocess.TimeoutExpired:

@@ -1,0 +1,63 @@
+digraph StylesheetExample {
+    graph [
+        goal="Demonstrate model stylesheet",
+        label="Stylesheet Example",
+        model_stylesheet="
+            /* Default model for all nodes */
+            * {
+                llm_model: gpt-4;
+                reasoning_effort: medium;
+            }
+            
+            /* Fast nodes use a lighter model */
+            .fast {
+                llm_model: gpt-3.5-turbo;
+                reasoning_effort: low;
+            }
+            
+            /* Critical nodes get the best model */
+            .critical {
+                llm_model: gpt-4-turbo;
+                reasoning_effort: high;
+            }
+            
+            /* Override for a specific node */
+            #final_review {
+                llm_model: claude-3-opus;
+                llm_provider: anthropic;
+            }
+        "
+    ]
+    
+    start [shape=Mdiamond, label="Start"]
+    exit  [shape=Msquare, label="Exit"]
+    
+    // This node will use default settings (gpt-4, medium)
+    initial_analysis [
+        label="Initial Analysis",
+        prompt="Analyze the problem"
+    ]
+    
+    // This node has class=fast, so uses gpt-3.5-turbo
+    quick_draft [
+        label="Quick Draft",
+        prompt="Create a quick draft",
+        class="fast"
+    ]
+    
+    // This node has class=critical, so uses gpt-4-turbo
+    implementation [
+        label="Critical Implementation",
+        prompt="Implement the solution carefully",
+        class="critical",
+        goal_gate=true
+    ]
+    
+    // This node has ID=final_review, so uses claude-3-opus
+    final_review [
+        label="Final Review",
+        prompt="Comprehensive final review"
+    ]
+    
+    start -> initial_analysis -> quick_draft -> implementation -> final_review -> exit
+}
