@@ -1,7 +1,7 @@
 from setuptools import setup, find_packages
 
 setup(
-    name="attractor",
+    name="py-attractor",
     version="0.1.0",
     description="A DOT-based pipeline runner for AI workflows",
     author="Attractor Contributors",
