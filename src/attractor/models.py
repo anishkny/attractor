@@ -247,3 +247,43 @@ def parse_duration(duration_str: str) -> float:
     else:
         # Try to parse as a plain number (assume seconds)
         return float(duration_str)
+
+
+# Human-in-the-loop models
+
+class QuestionType(Enum):
+    """Type of question for human interaction."""
+    MULTIPLE_CHOICE = "multiple_choice"
+    TEXT_INPUT = "text_input"
+    YES_NO = "yes_no"
+
+
+@dataclass
+class Option:
+    """An option for a multiple choice question."""
+    key: str  # Accelerator key (e.g., "Y", "N", "A")
+    label: str  # Display label
+
+
+@dataclass
+class Question:
+    """A question to ask a human."""
+    text: str  # Question text
+    type: QuestionType
+    options: List[Option] = field(default_factory=list)  # For multiple choice
+    stage: str = ""  # Stage ID for context
+
+
+@dataclass
+class Answer:
+    """Answer from a human."""
+    value: str  # Selected option key or text input
+    question: Question
+    timestamp: str = ""
+
+
+class AnswerStatus(Enum):
+    """Status of answer collection."""
+    ANSWERED = "answered"
+    TIMEOUT = "timeout"
+    SKIPPED = "skipped"
