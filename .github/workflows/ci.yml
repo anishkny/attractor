@@ -2,9 +2,8 @@ name: CI
 
 on:
   push:
-    branches: [ main, copilot/implement-attractor-spec ]
+    branches: main
   pull_request:
-    branches: [ main ]
 
 jobs:
   test:
