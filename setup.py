@@ -21,6 +21,7 @@ setup(
         "dev": [
             "pytest>=7.0.0",
             "pytest-asyncio>=0.21.0",
+            "ruff>=0.1.0",
         ],
     },
     entry_points={

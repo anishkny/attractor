@@ -1,0 +1,29 @@
+[tool.ruff]
+# Set the maximum line length to 127 (matching flake8 config)
+line-length = 127
+
+# Exclude common directories
+exclude = [
+    ".git",
+    ".pytest_cache",
+    "__pycache__",
+    "build",
+    "dist",
+    "*.egg-info",
+]
+
+[tool.ruff.lint]
+# Enable the same rule categories that flake8 was checking
+# E9: Runtime errors
+# F63, F7, F82: Various pyflakes errors (undefined names, syntax errors, etc.)
+# E: pycodestyle errors
+# F: pyflakes
+# C90: mccabe complexity
+select = ["E", "F", "C90"]
+
+# Ignore whitespace warnings that were only reported but not enforced by flake8
+ignore = ["W293"]  # blank line contains whitespace
+
+[tool.ruff.lint.mccabe]
+# Set max complexity to 10 (matching flake8 config)
+max-complexity = 10
