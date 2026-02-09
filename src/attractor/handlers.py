@@ -687,8 +687,18 @@ class ManagerLoopHandler(Handler):
                 child_logs_dir = stage_dir / "child_logs"
                 child_logs_dir.mkdir(exist_ok=True)
 
+                # Validate child_dotfile path
+                child_dotfile_path = Path(child_dotfile)
+                if not child_dotfile_path.exists():
+                    return Outcome(
+                        status=StageStatus.FAIL,
+                        failure_reason=f"Child dotfile does not exist: {child_dotfile}",
+                    )
+
+                # Use sys.executable to ensure same Python interpreter
+                import sys
                 child_process = subprocess.Popen(
-                    ["python", "-m", "attractor.cli", child_dotfile, "--logs-root", str(child_logs_dir)],
+                    [sys.executable, "-m", "attractor.cli", child_dotfile, "--logs-root", str(child_logs_dir)],
                     stdout=subprocess.PIPE,
                     stderr=subprocess.PIPE,
                 )

@@ -42,11 +42,20 @@ class PipelineRun:
 
 
 class PipelineServer:
-    """HTTP server for pipeline management."""
+    """
+    HTTP server for pipeline management.
+    
+    Security Note: By default, the server binds to 0.0.0.0 which makes it
+    accessible from all network interfaces. For production use, consider:
+    - Using host='127.0.0.1' for localhost-only access
+    - Setting up proper authentication and authorization
+    - Running behind a reverse proxy (nginx, Apache)
+    - Using HTTPS with proper certificates
+    """
 
     def __init__(
         self,
-        host: str = "0.0.0.0",
+        host: str = "127.0.0.1",
         port: int = 8080,
         logs_root: Optional[str] = None,
     ):
@@ -262,9 +271,19 @@ class PipelineServer:
 
 
 def create_server(
-    host: str = "0.0.0.0", port: int = 8080, logs_root: Optional[str] = None
+    host: str = "127.0.0.1", port: int = 8080, logs_root: Optional[str] = None
 ) -> PipelineServer:
-    """Create a pipeline HTTP server."""
+    """
+    Create a pipeline HTTP server.
+    
+    Args:
+        host: Host to bind to (default: 127.0.0.1 for localhost only)
+        port: Port to bind to (default: 8080)
+        logs_root: Directory for pipeline logs (default: "logs")
+        
+    Security Note: Use host="0.0.0.0" to listen on all interfaces,
+    but only do this if you understand the security implications.
+    """
     return PipelineServer(host=host, port=port, logs_root=logs_root)
 
 
@@ -273,7 +292,8 @@ def main():
     import sys
 
     port = int(os.environ.get("PORT", "8080"))
-    host = os.environ.get("HOST", "0.0.0.0")
+    # Allow overriding host via environment, default to localhost for security
+    host = os.environ.get("HOST", "127.0.0.1")
     logs_root = os.environ.get("LOGS_ROOT", "logs")
 
     server = create_server(host=host, port=port, logs_root=logs_root)
