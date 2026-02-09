@@ -260,7 +260,7 @@ class PipelineEngine:
         except ValueError as e:
             # No handler found for this node
             return Outcome(status=StageStatus.FAIL, failure_reason=str(e))
-        
+
         stage_start_time = time.time()
 
         # Emit stage started event
