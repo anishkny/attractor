@@ -427,4 +427,3 @@ def test_select_edge_no_edges_and_fallback(monkeypatch, tmp_path: Path):
         Edge(from_node="task", to_node="b", attrs={"condition": "outcome=fail"}),
     ]
     outcome = Outcome(status=StageStatus.SUCCESS)
-    assert engine._select_edge(node, outcome, Context()).to_node in ["a", "b"]

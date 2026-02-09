@@ -302,3 +302,118 @@ def test_server_run_and_main(monkeypatch, tmp_path):
     monkeypatch.setenv("LOGS_ROOT", str(tmp_path))
 
     server_module.main()
+
+def test_submit_pipeline_exception_handling():
+    """Test that exceptions during pipeline parsing return error."""
+    server = server_module.PipelineServer(host="127.0.0.1", port=8080)
+    client = server.app.test_client()
+
+    # Invalid DOT source should trigger exception handler
+    response = client.post(
+        "/pipelines", json={"dot_source": "invalid {"}
+    )
+    assert response.status_code == 500
+    assert "error" in response.get_json()
+
+
+def test_get_pipeline_status_not_found():
+    """Test getting status of non-existent pipeline."""
+    server = server_module.PipelineServer(host="127.0.0.1", port=8080)
+    client = server.app.test_client()
+
+    response = client.get("/pipelines/invalid_id")
+    assert response.status_code == 404
+    assert "not found" in response.get_json()["error"].lower()
+
+
+def test_get_pipeline_context_not_found():
+    """Test getting context of non-existent pipeline."""
+    server = server_module.PipelineServer(host="127.0.0.1", port=8080)
+    client = server.app.test_client()
+
+    response = client.get("/pipelines/invalid_id/context")
+    assert response.status_code == 404
+    assert "not found" in response.get_json()["error"].lower()
+
+
+def test_cancel_pipeline_not_found():
+    """Test cancelling non-existent pipeline."""
+    server = server_module.PipelineServer(host="127.0.0.1", port=8080)
+    client = server.app.test_client()
+
+    response = client.post("/pipelines/invalid_id/cancel")
+    assert response.status_code == 404
+    assert "not found" in response.get_json()["error"].lower()
+
+
+def test_cancel_pipeline_not_running():
+    """Test cancelling pipeline that isn't running."""
+    server = server_module.PipelineServer(host="127.0.0.1", port=8080)
+    client = server.app.test_client()
+
+    # Submit a pipeline
+    dot = """
+    digraph Test {
+        start [shape=Mdiamond]
+        exit [shape=Msquare]
+        start -> exit
+    }
+    """
+
+    response = client.post("/pipelines", json={"dot_source": dot})
+    assert response.status_code == 201
+    pipeline_id = response.get_json()["id"]
+
+    # Wait for pipeline to complete
+    import time
+    for _ in range(50):
+        status_response = client.get(f"/pipelines/{pipeline_id}")
+        if status_response.get_json()["status"] != "running":
+            break
+        time.sleep(0.1)
+
+    # Try to cancel completed pipeline
+    response = client.post(f"/pipelines/{pipeline_id}/cancel")
+    assert response.status_code == 400
+    assert "not running" in response.get_json()["error"].lower()
+
+
+def test_get_pipeline_events_not_found():
+    """Test getting events of non-existent pipeline."""
+    server = server_module.PipelineServer(host="127.0.0.1", port=8080)
+    client = server.app.test_client()
+
+    response = client.get("/pipelines/invalid_id/events")
+    assert response.status_code == 404
+    assert "not found" in response.get_json()["error"].lower()
+
+
+def test_health_check():
+    """Test health check endpoint."""
+    server = server_module.PipelineServer(host="127.0.0.1", port=8080)
+    client = server.app.test_client()
+
+    response = client.get("/health")
+    assert response.status_code == 200
+    assert response.get_json()["status"] == "ok"
+    assert "pipelines" in response.get_json()
+
+
+def test_missing_dot_source_in_request():
+    """Test submitting pipeline without dot_source."""
+    server = server_module.PipelineServer(host="127.0.0.1", port=8080)
+    client = server.app.test_client()
+
+    response = client.post("/pipelines", json={})
+    assert response.status_code == 400
+    assert "dot_source" in response.get_json()["error"].lower()
+
+
+def test_missing_json_in_request():
+    """Test submitting pipeline with no JSON data."""
+    server = server_module.PipelineServer(host="127.0.0.1", port=8080)
+    client = server.app.test_client()
+
+    response = client.post("/pipelines", json=None)
+    assert response.status_code == 400
+    assert "dot_source" in response.get_json()["error"].lower()

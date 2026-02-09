@@ -600,3 +600,18 @@ def test_manager_loop_ingest_child_telemetry_checkpoint(tmp_path: Path):
     handler._ingest_child_telemetry(context, stage_dir, None)
     assert context.get("stack.child.current_node") == "task"
     assert context.get("stack.child.completed_nodes") == 2
+
+def test_manager_loop_ingest_child_telemetry_bad_checkpoint(tmp_path: Path):
+    """Test that bad checkpoint JSON is silently ignored."""
+    handler = ManagerLoopHandler()
+    context = Context()
+    stage_dir = tmp_path / "stage"
+    child_logs = stage_dir / "child_logs" / "run_1"
+    child_logs.mkdir(parents=True)
+
+    checkpoint = child_logs / "checkpoint.json"
+    checkpoint.write_text("{NOT VALID JSON")
+
+    # Should not raise, just silently ignore the error
+    handler._ingest_child_telemetry(context, stage_dir, None)
+    assert context.get("stack.child.current_node") is None
