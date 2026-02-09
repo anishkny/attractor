@@ -23,10 +23,14 @@ setup(
             "pytest-asyncio>=0.21.0",
             "ruff>=0.1.0",
         ],
+        "server": [
+            "flask>=2.0.0",
+        ],
     },
     entry_points={
         "console_scripts": [
             "py-attractor=attractor.cli:main",
+            "py-attractor-server=attractor.server:main",
         ],
     },
 )
