@@ -255,7 +255,12 @@ class PipelineEngine:
         stage_index: int,
     ) -> Outcome:
         """Execute a node with retry logic."""
-        handler = self.handler_registry.resolve(node)
+        try:
+            handler = self.handler_registry.resolve(node)
+        except ValueError as e:
+            # No handler found for this node
+            return Outcome(status=StageStatus.FAIL, failure_reason=str(e))
+        
         stage_start_time = time.time()
 
         # Emit stage started event
@@ -401,8 +406,13 @@ class PipelineEngine:
         if unconditional:
             return self._best_by_weight_then_lexical(unconditional)
 
-        # Fallback: any edge
-        return self._best_by_weight_then_lexical(edges)
+        # Fallback: If outcome is not FAIL and there are conditional edges that didn't match,
+        # select any edge as a fallback to keep the pipeline moving
+        if outcome.status != StageStatus.FAIL:
+            return self._best_by_weight_then_lexical(edges)
+
+        # No matching edge found for FAIL outcome
+        return None
 
     def _normalize_label(self, label: str) -> str:
         """Normalize a label for matching."""
