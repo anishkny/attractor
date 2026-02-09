@@ -120,16 +120,16 @@ class PipelineServer:
                         outcome = engine.run(context)
                         pipeline_run.outcome = outcome
                         pipeline_run.status = (
-                            "completed" if outcome.status.value == "success" else "failed"
+                            "completed"
+                            if outcome.status.value == "success"
+                            else "failed"
                         )
                         pipeline_run.end_time = time.time()
                     except Exception as e:
                         pipeline_run.status = "failed"
                         pipeline_run.end_time = time.time()
                         # Add error to event queue
-                        event_queue.put(
-                            {"type": "error", "message": str(e)}
-                        )
+                        event_queue.put({"type": "error", "message": str(e)})
 
                 thread = threading.Thread(target=run_pipeline_thread, daemon=True)
                 pipeline_run.thread = thread

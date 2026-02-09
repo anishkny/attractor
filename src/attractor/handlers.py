@@ -670,9 +670,12 @@ class ManagerLoopHandler(Handler):
         max_cycles = int(node.attrs.get("manager.max_cycles", "1000"))
         stop_condition = node.attrs.get("manager.stop_condition", "")
         actions = [
-            a.strip() for a in node.attrs.get("manager.actions", "observe,wait").split(",")
+            a.strip()
+            for a in node.attrs.get("manager.actions", "observe,wait").split(",")
         ]
-        child_autostart = node.attrs.get("stack.child_autostart", "true").lower() == "true"
+        child_autostart = (
+            node.attrs.get("stack.child_autostart", "true").lower() == "true"
+        )
 
         # Create stage directory
         stage_dir = Path(logs_root) / node.id
@@ -696,8 +699,16 @@ class ManagerLoopHandler(Handler):
 
                 # Use sys.executable to ensure same Python interpreter
                 import sys
+
                 child_process = subprocess.Popen(
-                    [sys.executable, "-m", "attractor.cli", child_dotfile, "--logs-root", str(child_logs_dir)],
+                    [
+                        sys.executable,
+                        "-m",
+                        "attractor.cli",
+                        child_dotfile,
+                        "--logs-root",
+                        str(child_logs_dir),
+                    ],
                     stdout=subprocess.PIPE,
                     stderr=subprocess.PIPE,
                 )
@@ -798,9 +809,7 @@ class ManagerLoopHandler(Handler):
         }
         return value * conversions.get(unit, 1.0)
 
-    def _ingest_child_telemetry(
-        self, context: Context, stage_dir: Path, child_process
-    ):
+    def _ingest_child_telemetry(self, context: Context, stage_dir: Path, child_process):
         """Ingest telemetry from child pipeline."""
         import json
 
