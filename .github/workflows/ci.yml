@@ -30,7 +30,7 @@ jobs:
     
     - name: Run tests
       run: |
-        pytest --cov=src/ --cov-report term --cov-report html --cov-report json
+        pytest --cov=src --cov-report term --cov-report html --cov-report json
     
     - name: Validate example pipelines
       run: |
