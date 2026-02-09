@@ -11,16 +11,15 @@ import queue
 import threading
 import time
 import uuid
-from dataclasses import asdict, dataclass
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, Optional
 
-from flask import Flask, Response, jsonify, request, send_file
+from flask import Flask, Response, jsonify, request
 
-from .engine import PipelineEngine, run_pipeline
+from .engine import PipelineEngine
 from .events import Event, EventEmitter
-from .handlers import HandlerRegistry
-from .models import Context, Graph, Outcome, Question, Answer, AnswerStatus
+from .models import Context, Outcome, Question
 from .parser import parse_dot_string
 
 
@@ -44,7 +43,7 @@ class PipelineRun:
 class PipelineServer:
     """
     HTTP server for pipeline management.
-    
+
     Security Note: By default, the server binds to 0.0.0.0 which makes it
     accessible from all network interfaces. For production use, consider:
     - Using host='127.0.0.1' for localhost-only access
@@ -275,12 +274,12 @@ def create_server(
 ) -> PipelineServer:
     """
     Create a pipeline HTTP server.
-    
+
     Args:
         host: Host to bind to (default: 127.0.0.1 for localhost only)
         port: Port to bind to (default: 8080)
         logs_root: Directory for pipeline logs (default: "logs")
-        
+
     Security Note: Use host="0.0.0.0" to listen on all interfaces,
     but only do this if you understand the security implications.
     """
@@ -289,7 +288,6 @@ def create_server(
 
 def main():
     """Main entry point for the server."""
-    import sys
 
     port = int(os.environ.get("PORT", "8080"))
     # Allow overriding host via environment, default to localhost for security

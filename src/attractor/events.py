@@ -6,7 +6,7 @@ The engine emits typed events during execution for UI, logging, and metrics inte
 
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Callable, List, Optional
+from typing import Callable, List
 
 
 class EventType(Enum):

@@ -640,9 +640,9 @@ class FanInHandler(Handler):
 class ManagerLoopHandler(Handler):
     """
     Manager loop handler for supervising child pipelines.
-    
-    Orchestrates sprint-based iteration by supervising a child pipeline. 
-    The manager observes the child's telemetry, evaluates progress via a 
+
+    Orchestrates sprint-based iteration by supervising a child pipeline.
+    The manager observes the child's telemetry, evaluates progress via a
     guard function, and optionally steers the child through intervention.
     """
 
@@ -650,7 +650,6 @@ class ManagerLoopHandler(Handler):
         self, node: Node, context: Context, graph: Graph, logs_root: str
     ) -> Outcome:
         """Execute manager loop supervision."""
-        import json
         import subprocess
         import time
         from pathlib import Path
@@ -803,6 +802,8 @@ class ManagerLoopHandler(Handler):
         self, context: Context, stage_dir: Path, child_process
     ):
         """Ingest telemetry from child pipeline."""
+        import json
+
         # Check if child process is still running
         if child_process:
             poll_result = child_process.poll()
