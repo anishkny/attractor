@@ -88,6 +88,7 @@ class HandlerRegistry:
         self.register("wait.human", WaitForHumanHandler())
         self.register("parallel", ParallelHandler())
         self.register("parallel.fan_in", FanInHandler())
+        self.register("stack.manager_loop", ManagerLoopHandler())
 
     def register(self, type_string: str, handler: Handler):
         """Register a handler for a type string."""
@@ -619,6 +620,234 @@ class FanInHandler(Handler):
 
         self._write_status(stage_dir, outcome)
         return outcome
+
+    def _write_status(self, stage_dir: Path, outcome: Outcome):
+        """Write status.json to stage directory."""
+        import json
+
+        status_data = {
+            "outcome": outcome.status.value,
+            "preferred_next_label": outcome.preferred_label,
+            "suggested_next_ids": outcome.suggested_next_ids,
+            "notes": outcome.notes,
+            "failure_reason": outcome.failure_reason,
+        }
+
+        with open(stage_dir / "status.json", "w") as f:
+            json.dump(status_data, f, indent=2)
+
+
+class ManagerLoopHandler(Handler):
+    """
+    Manager loop handler for supervising child pipelines.
+
+    Orchestrates sprint-based iteration by supervising a child pipeline.
+    The manager observes the child's telemetry, evaluates progress via a
+    guard function, and optionally steers the child through intervention.
+    """
+
+    def execute(
+        self, node: Node, context: Context, graph: Graph, logs_root: str
+    ) -> Outcome:
+        """Execute manager loop supervision."""
+        import subprocess
+        import time
+        from pathlib import Path
+
+        from .conditions import evaluate_condition
+
+        # Parse configuration
+        child_dotfile = graph.attrs.get("stack.child_dotfile", "")
+        if not child_dotfile:
+            return Outcome(
+                status=StageStatus.FAIL,
+                failure_reason="No child_dotfile specified in graph attributes",
+            )
+
+        poll_interval_str = node.attrs.get("manager.poll_interval", "45s")
+        poll_interval = self._parse_duration(poll_interval_str)
+
+        max_cycles = int(node.attrs.get("manager.max_cycles", "1000"))
+        stop_condition = node.attrs.get("manager.stop_condition", "")
+        actions = [
+            a.strip()
+            for a in node.attrs.get("manager.actions", "observe,wait").split(",")
+        ]
+        child_autostart = (
+            node.attrs.get("stack.child_autostart", "true").lower() == "true"
+        )
+
+        # Create stage directory
+        stage_dir = Path(logs_root) / node.id
+        stage_dir.mkdir(parents=True, exist_ok=True)
+
+        # 1. Auto-start child if configured
+        child_process = None
+        if child_autostart:
+            try:
+                # Start child pipeline in subprocess
+                child_logs_dir = stage_dir / "child_logs"
+                child_logs_dir.mkdir(exist_ok=True)
+
+                # Validate child_dotfile path
+                child_dotfile_path = Path(child_dotfile)
+                if not child_dotfile_path.exists():
+                    return Outcome(
+                        status=StageStatus.FAIL,
+                        failure_reason=f"Child dotfile does not exist: {child_dotfile}",
+                    )
+
+                # Use sys.executable to ensure same Python interpreter
+                import sys
+
+                child_process = subprocess.Popen(
+                    [
+                        sys.executable,
+                        "-m",
+                        "attractor.cli",
+                        child_dotfile,
+                        "--logs-root",
+                        str(child_logs_dir),
+                    ],
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                )
+                context.set("stack.child.pid", str(child_process.pid))
+                context.set("stack.child.status", "running")
+            except Exception as e:
+                return Outcome(
+                    status=StageStatus.FAIL,
+                    failure_reason=f"Failed to start child pipeline: {e}",
+                )
+
+        # 2. Observation loop
+        for cycle in range(1, max_cycles + 1):
+            # Observe: ingest child telemetry
+            if "observe" in actions:
+                self._ingest_child_telemetry(context, stage_dir, child_process)
+
+            # Steer: optionally intervene (simplified - just log for now)
+            if "steer" in actions:
+                steer_msg = f"Cycle {cycle}: Observing child progress"
+                context.set("stack.steer.last_message", steer_msg)
+
+            # Evaluate stop conditions
+            child_status = context.get("stack.child.status", "")
+            if child_status in ["completed", "failed"]:
+                child_outcome = context.get("stack.child.outcome", "")
+                if child_outcome == "success" or child_status == "completed":
+                    # Write outcome
+                    outcome = Outcome(
+                        status=StageStatus.SUCCESS,
+                        notes="Child pipeline completed successfully",
+                    )
+                    self._write_status(stage_dir, outcome)
+                    return outcome
+                if child_status == "failed":
+                    outcome = Outcome(
+                        status=StageStatus.FAIL,
+                        failure_reason="Child pipeline failed",
+                    )
+                    self._write_status(stage_dir, outcome)
+                    return outcome
+
+            # Check custom stop condition
+            if stop_condition:
+                try:
+                    if evaluate_condition(
+                        stop_condition,
+                        Outcome(status=StageStatus.SUCCESS),
+                        context,
+                    ):
+                        outcome = Outcome(
+                            status=StageStatus.SUCCESS,
+                            notes="Stop condition satisfied",
+                        )
+                        self._write_status(stage_dir, outcome)
+                        return outcome
+                except Exception:
+                    pass  # Continue if condition evaluation fails
+
+            # Wait before next cycle
+            if "wait" in actions:
+                time.sleep(poll_interval)
+
+        # Max cycles exceeded
+        # Terminate child if still running
+        if child_process and child_process.poll() is None:
+            child_process.terminate()
+            try:
+                child_process.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                child_process.kill()
+
+        outcome = Outcome(
+            status=StageStatus.FAIL,
+            failure_reason=f"Max cycles ({max_cycles}) exceeded",
+        )
+        self._write_status(stage_dir, outcome)
+        return outcome
+
+    def _parse_duration(self, duration_str: str) -> float:
+        """Parse duration string to seconds."""
+        import re
+
+        duration_str = duration_str.strip()
+        match = re.match(r"(\d+(?:\.\d+)?)\s*(ms|s|m|h|d)?", duration_str)
+        if not match:
+            return 45.0  # Default
+
+        value = float(match.group(1))
+        unit = match.group(2) or "s"
+
+        conversions = {
+            "ms": 0.001,
+            "s": 1.0,
+            "m": 60.0,
+            "h": 3600.0,
+            "d": 86400.0,
+        }
+        return value * conversions.get(unit, 1.0)
+
+    def _ingest_child_telemetry(self, context: Context, stage_dir: Path, child_process):
+        """Ingest telemetry from child pipeline."""
+        import json
+
+        # Check if child process is still running
+        if child_process:
+            poll_result = child_process.poll()
+            if poll_result is not None:
+                # Child has exited
+                if poll_result == 0:
+                    context.set("stack.child.status", "completed")
+                    context.set("stack.child.outcome", "success")
+                else:
+                    context.set("stack.child.status", "failed")
+                    context.set("stack.child.outcome", "failure")
+                return
+
+        # Try to read child's checkpoint/manifest
+        child_logs_dir = stage_dir / "child_logs"
+        if child_logs_dir.exists():
+            # Look for most recent run directory
+            run_dirs = sorted(child_logs_dir.glob("run_*"))
+            if run_dirs:
+                latest_run = run_dirs[-1]
+                checkpoint_path = latest_run / "checkpoint.json"
+                if checkpoint_path.exists():
+                    try:
+                        with open(checkpoint_path) as f:
+                            checkpoint_data = json.load(f)
+                            context.set(
+                                "stack.child.current_node",
+                                checkpoint_data.get("current_node", ""),
+                            )
+                            context.set(
+                                "stack.child.completed_nodes",
+                                len(checkpoint_data.get("completed_nodes", [])),
+                            )
+                    except Exception:
+                        pass  # Ignore read errors
 
     def _write_status(self, stage_dir: Path, outcome: Outcome):
         """Write status.json to stage directory."""

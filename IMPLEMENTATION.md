@@ -5,10 +5,10 @@ This is a working implementation of the Attractor specification - a DOT-based pi
 
 ## Implementation Statistics
 
-- **Lines of Code**: ~2,300 lines (excluding tests)
-- **Test Coverage**: 47 passing tests
+- **Lines of Code**: ~3,400 lines (excluding tests)
+- **Test Coverage**: 61 passing tests
 - **Test Files**: 8 test suites
-- **Source Files**: 9 Python modules
+- **Source Files**: 11 Python modules
 - **Examples**: 5 DOT pipeline examples
 
 ## What's Implemented
@@ -256,26 +256,50 @@ The following features have been added in this update:
    - LLM model/provider configuration
    - 11 comprehensive tests
 
+5. **Manager Loop Handler** (Section 4.11)
+   - ManagerLoopHandler (house nodes) - supervisor pattern
+   - Child pipeline supervision with observe/steer/wait cycle
+   - Automatic child process management
+   - Telemetry ingestion from child checkpoints
+   - Configurable polling intervals and max cycles
+   - Stop condition evaluation
+
+6. **Observability Events** (Section 9.6)
+   - Typed event system with 14 event types
+   - Pipeline lifecycle events (started, completed, failed)
+   - Stage lifecycle events (started, completed, failed, retrying)
+   - Parallel execution events
+   - Interview events (human-in-the-loop)
+   - Checkpoint events
+   - Observer pattern with EventEmitter
+   - Integration with engine for automatic event emission
+   - 14 comprehensive tests
+
+7. **HTTP Server Mode** (Section 9.5)
+   - Flask-based HTTP server
+   - POST /pipelines - Submit pipelines
+   - GET /pipelines/{id} - Get status
+   - GET /pipelines/{id}/events - SSE event streaming
+   - POST /pipelines/{id}/cancel - Cancel pipelines
+   - GET /pipelines/{id}/context - Get context
+   - GET /health - Health check
+   - Background thread execution
+   - Real-time event streaming via SSE
+
 ## What's Not Implemented
 
 These remain as future enhancements:
 
-1. **Advanced Handlers**
-   - ManagerLoopHandler (house nodes) - supervisor pattern
-   - Observe/steer/wait cycle support
-
-2. **Infrastructure**
-   - HTTP server mode (Section 9.5)
-   - Observability events (Section 9.6)
+1. **Infrastructure**
    - Tool call hooks (Section 9.7)
    - ArtifactStore (large object storage)
 
-3. **Context Fidelity** (Section 5.4)
+2. **Context Fidelity** (Section 5.4)
    - Session management (full, compact, summary modes)
    - Thread ID resolution
    - LLM session reuse
 
-4. **Full Parallel Execution**
+3. **Full Parallel Execution**
    - Complete subgraph execution in parallel branches
    - Context merging from parallel branches
    - Proper concurrent execution with thread pools

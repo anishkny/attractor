@@ -10,6 +10,17 @@ from pathlib import Path
 from typing import List, Optional, Tuple
 
 from .conditions import evaluate_condition
+from .events import (
+    CheckpointSavedEvent,
+    EventEmitter,
+    PipelineCompletedEvent,
+    PipelineFailedEvent,
+    PipelineStartedEvent,
+    StageCompletedEvent,
+    StageFailedEvent,
+    StageRetryingEvent,
+    StageStartedEvent,
+)
 from .handlers import CodergenHandler, HandlerRegistry
 from .models import Checkpoint, Context, Graph, Node, Outcome, StageStatus
 from .validation import validate_or_raise
@@ -51,10 +62,12 @@ class PipelineEngine:
         graph: Graph,
         handler_registry: Optional[HandlerRegistry] = None,
         logs_root: Optional[str] = None,
+        event_emitter: Optional[EventEmitter] = None,
     ):
         self.graph = graph
         self.handler_registry = handler_registry or self._create_default_registry()
         self.logs_root = logs_root or self._create_logs_root()
+        self.event_emitter = event_emitter or EventEmitter()
 
         # Validate the graph
         validate_or_raise(graph)
@@ -75,8 +88,16 @@ class PipelineEngine:
 
     def run(self, context: Optional[Context] = None) -> Outcome:
         """Run the pipeline from start to finish."""
+        start_time = time.time()
+        pipeline_id = Path(self.logs_root).name
+
         if context is None:
             context = Context()
+
+        # Emit pipeline started event
+        self.event_emitter.emit(
+            PipelineStartedEvent(self.graph.name or "unnamed", pipeline_id)
+        )
 
         # Mirror graph attributes into context
         context.set("graph.goal", self.graph.goal)
@@ -88,64 +109,95 @@ class PipelineEngine:
         completed_nodes = []
         node_outcomes = {}
         node_retries = {}
+        stage_index = 0
 
         # Find start node
         current_node = self._find_start_node()
 
-        # Main execution loop
-        while True:
-            node = self.graph.nodes[current_node.id]
+        try:
+            # Main execution loop
+            while True:
+                node = self.graph.nodes[current_node.id]
 
-            # Step 1: Check for terminal node
-            if self._is_terminal(node):
-                gate_ok, failed_gate = self._check_goal_gates(node_outcomes)
-                if not gate_ok and failed_gate:
-                    retry_target = self._get_retry_target(failed_gate)
-                    if retry_target:
-                        current_node = self.graph.nodes[retry_target]
-                        continue
-                    else:
-                        return Outcome(
+                # Step 1: Check for terminal node
+                if self._is_terminal(node):
+                    gate_ok, failed_gate = self._check_goal_gates(node_outcomes)
+                    if not gate_ok and failed_gate:
+                        retry_target = self._get_retry_target(failed_gate)
+                        if retry_target:
+                            current_node = self.graph.nodes[retry_target]
+                            continue
+                        else:
+                            failure_outcome = Outcome(
+                                status=StageStatus.FAIL,
+                                failure_reason="Goal gate unsatisfied and no retry target",
+                            )
+                            # Emit pipeline failed event
+                            self.event_emitter.emit(
+                                PipelineFailedEvent(
+                                    failure_outcome.failure_reason or "Unknown error",
+                                    time.time() - start_time,
+                                )
+                            )
+                            return failure_outcome
+                    # Pipeline complete
+                    break
+
+                # Step 2: Execute node with retry
+                retry_policy = self._build_retry_policy(node)
+                outcome = self._execute_with_retry(
+                    node, context, retry_policy, node_retries, stage_index
+                )
+
+                stage_index += 1
+
+                # Step 3: Record completion
+                completed_nodes.append(node.id)
+                node_outcomes[node.id] = outcome
+
+                # Step 4: Apply context updates
+                for key, value in outcome.context_updates.items():
+                    context.set(key, value)
+                context.set("outcome", outcome.status.value)
+                if outcome.preferred_label:
+                    context.set("preferred_label", outcome.preferred_label)
+
+                # Step 5: Save checkpoint
+                self._save_checkpoint(
+                    context, current_node.id, completed_nodes, node_retries
+                )
+
+                # Step 6: Select next edge
+                next_edge = self._select_edge(node, outcome, context)
+                if next_edge is None:
+                    if outcome.status == StageStatus.FAIL:
+                        failure_outcome = Outcome(
                             status=StageStatus.FAIL,
-                            failure_reason="Goal gate unsatisfied and no retry target",
+                            failure_reason="Stage failed with no outgoing fail edge",
                         )
-                # Pipeline complete
-                break
+                        # Emit pipeline failed event
+                        self.event_emitter.emit(
+                            PipelineFailedEvent(
+                                failure_outcome.failure_reason or "Unknown error",
+                                time.time() - start_time,
+                            )
+                        )
+                        return failure_outcome
+                    break
 
-            # Step 2: Execute node with retry
-            retry_policy = self._build_retry_policy(node)
-            outcome = self._execute_with_retry(
-                node, context, retry_policy, node_retries
+                # Step 7: Advance to next node
+                current_node = self.graph.nodes[next_edge.to_node]
+        except Exception as e:
+            # Emit pipeline failed event
+            self.event_emitter.emit(
+                PipelineFailedEvent(str(e), time.time() - start_time)
             )
+            raise
 
-            # Step 3: Record completion
-            completed_nodes.append(node.id)
-            node_outcomes[node.id] = outcome
-
-            # Step 4: Apply context updates
-            for key, value in outcome.context_updates.items():
-                context.set(key, value)
-            context.set("outcome", outcome.status.value)
-            if outcome.preferred_label:
-                context.set("preferred_label", outcome.preferred_label)
-
-            # Step 5: Save checkpoint
-            self._save_checkpoint(
-                context, current_node.id, completed_nodes, node_retries
-            )
-
-            # Step 6: Select next edge
-            next_edge = self._select_edge(node, outcome, context)
-            if next_edge is None:
-                if outcome.status == StageStatus.FAIL:
-                    return Outcome(
-                        status=StageStatus.FAIL,
-                        failure_reason="Stage failed with no outgoing fail edge",
-                    )
-                break
-
-            # Step 7: Advance to next node
-            current_node = self.graph.nodes[next_edge.to_node]
+        # Emit pipeline completed event
+        duration = time.time() - start_time
+        artifact_count = len(completed_nodes)
+        self.event_emitter.emit(PipelineCompletedEvent(duration, artifact_count))
 
         # Return final outcome
         return Outcome(
@@ -200,9 +252,14 @@ class PipelineEngine:
         context: Context,
         retry_policy: RetryPolicy,
         node_retries: dict,
+        stage_index: int,
     ) -> Outcome:
         """Execute a node with retry logic."""
         handler = self.handler_registry.resolve(node)
+        stage_start_time = time.time()
+
+        # Emit stage started event
+        self.event_emitter.emit(StageStartedEvent(node.label or node.id, stage_index))
 
         for attempt in range(1, retry_policy.max_attempts + 1):
             try:
@@ -210,9 +267,25 @@ class PipelineEngine:
             except Exception as e:
                 if attempt < retry_policy.max_attempts:
                     delay = retry_policy.delay_for_attempt(attempt)
+                    # Emit stage retrying event
+                    self.event_emitter.emit(
+                        StageRetryingEvent(
+                            node.label or node.id, stage_index, attempt + 1, delay
+                        )
+                    )
                     time.sleep(delay)
                     continue
                 else:
+                    # Emit stage failed event
+                    duration = time.time() - stage_start_time
+                    self.event_emitter.emit(
+                        StageFailedEvent(
+                            node.label or node.id,
+                            stage_index,
+                            f"Exception: {e!s}",
+                            False,
+                        )
+                    )
                     return Outcome(
                         status=StageStatus.FAIL, failure_reason=f"Exception: {e!s}"
                     )
@@ -222,6 +295,11 @@ class PipelineEngine:
                 # Reset retry counter
                 if node.id in node_retries:
                     del node_retries[node.id]
+                # Emit stage completed event
+                duration = time.time() - stage_start_time
+                self.event_emitter.emit(
+                    StageCompletedEvent(node.label or node.id, stage_index, duration)
+                )
                 return outcome
 
             if outcome.status == StageStatus.RETRY:
@@ -229,22 +307,63 @@ class PipelineEngine:
                     # Increment retry counter
                     node_retries[node.id] = node_retries.get(node.id, 0) + 1
                     delay = retry_policy.delay_for_attempt(attempt)
+                    # Emit stage retrying event
+                    self.event_emitter.emit(
+                        StageRetryingEvent(
+                            node.label or node.id, stage_index, attempt + 1, delay
+                        )
+                    )
                     time.sleep(delay)
                     continue
                 else:
                     # Retries exhausted
+                    duration = time.time() - stage_start_time
                     if node.allow_partial:
+                        self.event_emitter.emit(
+                            StageCompletedEvent(
+                                node.label or node.id, stage_index, duration
+                            )
+                        )
                         return Outcome(
                             status=StageStatus.PARTIAL_SUCCESS,
                             notes="retries exhausted, partial accepted",
                         )
+                    # Emit stage failed event
+                    self.event_emitter.emit(
+                        StageFailedEvent(
+                            node.label or node.id,
+                            stage_index,
+                            "max retries exceeded",
+                            False,
+                        )
+                    )
                     return Outcome(
                         status=StageStatus.FAIL, failure_reason="max retries exceeded"
                     )
 
             if outcome.status == StageStatus.FAIL:
+                # Emit stage failed event
+                duration = time.time() - stage_start_time
+                self.event_emitter.emit(
+                    StageFailedEvent(
+                        node.label or node.id,
+                        stage_index,
+                        outcome.failure_reason or "Unknown failure",
+                        False,
+                    )
+                )
                 return outcome
 
+        # Emit stage failed event (shouldn't reach here)
+        duration = time.time() - stage_start_time
+        self.event_emitter.emit(
+            StageFailedEvent(
+                node.label or node.id,
+                stage_index,
+                "max retries exceeded",
+                False,
+            )
+        )
         return Outcome(status=StageStatus.FAIL, failure_reason="max retries exceeded")
 
     def _select_edge(self, node: Node, outcome: Outcome, context: Context):
@@ -325,6 +444,9 @@ class PipelineEngine:
         checkpoint_path = Path(self.logs_root) / "checkpoint.json"
         checkpoint.save(str(checkpoint_path))
 
+        # Emit checkpoint saved event
+        self.event_emitter.emit(CheckpointSavedEvent(current_node))
+
     def _write_manifest(self):
         """Write pipeline manifest."""
         manifest = {
@@ -347,7 +469,8 @@ def run_pipeline(
     context: Optional[Context] = None,
     handler_registry: Optional[HandlerRegistry] = None,
     logs_root: Optional[str] = None,
+    event_emitter: Optional[EventEmitter] = None,
 ) -> Outcome:
     """Run a pipeline and return the final outcome."""
-    engine = PipelineEngine(graph, handler_registry, logs_root)
+    engine = PipelineEngine(graph, handler_registry, logs_root, event_emitter)
     return engine.run(context)
