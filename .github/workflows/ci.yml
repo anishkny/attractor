@@ -10,10 +10,10 @@ jobs:
     runs-on: ubuntu-latest
     
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
     
     - name: Set up Python
-      uses: actions/setup-python@v5
+      uses: actions/setup-python@v6
       with:
         python-version: "3.14"
     
@@ -21,7 +21,7 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         pip install -e .
-        pip install pytest ruff
+        pip install ruff pytest pytest-cov
     
     - name: Lint with ruff
       run: |
@@ -30,7 +30,7 @@ jobs:
     
     - name: Run tests
       run: |
-        pytest tests/ -v
+        pytest --cov=src --cov-report term-missing --cov-report html --cov-report json
     
     - name: Validate example pipelines
       run: |

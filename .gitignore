@@ -25,6 +25,7 @@ wheels/
 .coverage
 htmlcov/
 .tox/
+coverage.json
 
 # Virtual environments
 venv/
