@@ -7,7 +7,7 @@ name = "py-attractor"
 version = "0.3.0"
 description = "A DOT-based pipeline runner for AI workflows"
 readme = "README.md"
-requires-python = ">=3.8"
+requires-python = ">=3.13"
 authors = [
     {name = "Attractor Contributors"},
 ]
@@ -37,8 +37,8 @@ where = ["src"]
 # Modern recommended line length
 line-length = 88
 
-# Assume Python 3.8+ (matching setup.py requirement)
-target-version = "py38"
+# Assume Python 3.13+ (matching pyproject.toml requirement)
+target-version = "py313"
 
 [tool.ruff.lint]
 # Use modern recommended rule set
